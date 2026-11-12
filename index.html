@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#faf7f2">
+<title>我们的100天</title>
+<meta name="description" content="异地 · 但心很近。属于我们的一百天。">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💗</text></svg>">
+
+<!-- MapLibre GL JS：项目本地文件，不依赖任何 CDN；本地文件丢失时才自动切换到 CDN -->
+<link href="vendor/maplibre-gl.css" rel="stylesheet">
+<script src="vendor/maplibre-gl.js"></script>
+<link href="https://cdn.bootcdn.net/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.css" rel="stylesheet">
+<script>window.maplibregl || document.write('<script src="https://cdn.bootcdn.net/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.js"><\/script>')</script>
+<script>window.maplibregl || document.write('<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"><\/script>')</script>
+<script>window.maplibregl || document.write('<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"><\/script>')</script>
+
+<!-- 手写体字体（可选）。若无法加载会回退到系统楷体/衬线字体，不影响使用 -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@300;400;500&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --paper: #faf7f2;          /* 纸张底色 */
+    --paper-card: #fffdf9;     /* 卡片底色 */
+    --ink: #4b4945;            /* 主文字（柔和炭色） */
+    --ink-soft: #8a8379;       /* 次要文字 */
+    --line: #e7dfd3;           /* 分割线 / 手绘边框 */
+    --rose: #c9a3a0;           /* 低饱和玫瑰色（主色） */
+    --rose-deep: #9e7571;      /* 玫瑰色加深 */
+    --rose-fill: #ead3cf;      /* 玫瑰浅填充 */
+    --shadow: 0 10px 30px rgba(120, 100, 90, .16);
+  }
+
+  *{ box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body{
+    height:100%; margin:0; padding:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"Noto Serif SC","Songti SC","STSong","SimSun",serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  body{ position:fixed; inset:0; overflow:hidden; overscroll-behavior:none; }
+
+  #map{ position:absolute; inset:0; }
+
+  /* 低饱和：只让底图变柔和（HTML 标记和弹窗不受影响） */
+  .maplibregl-canvas{
+    filter: saturate(.55) contrast(.94) sepia(.05);
+  }
+
+  /* 全屏纸张颗粒质感（非常轻微，营造手绘纸感） */
+  .paper-noise{
+    position:fixed; inset:0; pointer-events:none; z-index:60;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='160' height='160' filter='url(%23n)' opacity='0.5'/></svg>");
+    opacity:.05; mix-blend-mode:multiply;
+  }
+
+  /* ---------- 顶部标题卡片 ---------- */
+  .top-card{
+    position:fixed; z-index:70;
+    top: calc(env(safe-area-inset-top, 0px) + 16px);
+    left:16px; max-width: calc(100vw - 32px);
+    padding: 16px 20px 14px;
+    background: rgba(255,253,249,.9);
+    border:1.5px solid var(--line);
+    border-radius: 14px 16px 13px 15px / 15px 13px 16px 14px; /* 不规则圆角 = 手绘感 */
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(6px);
+  }
+  .top-card h1{
+    margin:0; font-family:"Ma Shan Zheng","Kaiti SC","STKaiti","KaiTi",cursive;
+    font-weight:400; font-size:30px; line-height:1.1; letter-spacing:.06em;
+    color:var(--ink);
+  }
+  .top-card .sub{
+    margin:6px 0 0; font-size:13px; letter-spacing:.18em; color:var(--ink-soft);
+  }
+
+  /* ---------- 底部提示 ---------- */
+  .hint{
+    position:fixed; z-index:70;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 18px);
+    left:50%; transform:translateX(-50%);
+    padding:9px 16px; white-space:nowrap;
+    background: rgba(255,253,249,.92);
+    border:1.5px solid var(--line);
+    border-radius: 999px 999px 997px 998px / 998px 999px 999px 997px;
+    box-shadow: var(--shadow);
+    font-size:13px; letter-spacing:.04em; color:var(--ink-soft);
+    backdrop-filter: blur(6px);
+  }
+  .hint .heart{ color:var(--rose-deep); }
+
+  /* ---------- 「全图」复位按钮 ---------- */
+  .reset-btn{
+    position:fixed; z-index:70;
+    top: calc(env(safe-area-inset-top, 0px) + 16px);
+    right:16px;
+    padding:10px 15px;
+    background: rgba(255,253,249,.92);
+    border:1.5px solid var(--line);
+    border-radius: 13px 15px 12px 14px / 14px 12px 15px 13px;
+    box-shadow: var(--shadow);
+    color:var(--ink-soft); font-size:14px; letter-spacing:.06em; line-height:1;
+    backdrop-filter: blur(6px); cursor:pointer;
+  }
+  .reset-btn:hover, .reset-btn:active{ color:var(--rose-deep); }
+
+  /* ---------- 提示条（token 未填 / 加载失败） ---------- */
+  .notice{
+    position:fixed; z-index:90;
+    top:50%; left:50%; transform:translate(-50%,-50%);
+    max-width: min(84vw, 380px); padding:18px 22px;
+    background:var(--paper-card); border:1.5px solid var(--line);
+    border-radius:12px; box-shadow:var(--shadow);
+    font-size:14px; line-height:1.7; text-align:center; color:var(--ink);
+  }
+
+  /* ---------- 地图标记 ---------- */
+  .marker{ cursor:pointer; display:flex; flex-direction:column; align-items:center; }
+  .marker .heart{ filter: drop-shadow(0 2px 3px rgba(120,90,85,.28)); transition: transform .18s ease; }
+  .marker:hover .heart, .marker:active .heart{ transform: scale(1.08); }
+  .marker-label{
+    margin-bottom:3px; padding:2px 8px;
+    font-family:"Ma Shan Zheng","Kaiti SC","STKaiti","KaiTi",cursive;
+    font-size:14px; line-height:1.2; color:var(--rose-deep);
+    background: rgba(255,253,249,.86);
+    border-radius: 999px; white-space:nowrap; max-width: 120px;
+    overflow:hidden; text-overflow:ellipsis;
+  }
+
+  /* ---------- 弹窗卡片 ---------- */
+  .memory-popup .maplibregl-popup-content{
+    background:transparent; padding:0; box-shadow:none; border-radius:0;
+  }
+  .memory-popup .maplibregl-popup-tip{ display:none; }
+  .memory-popup .maplibregl-popup-close-button{
+    position:absolute; top:8px; right:10px; z-index:2;
+    width:26px; height:26px; border-radius:50%;
+    background: rgba(255,253,249,.92); border:1px solid var(--line);
+    color:var(--ink-soft); font-size:18px; line-height:1; font-weight:400;
+  }
+  .memory-popup .maplibregl-popup-close-button:hover{ color:var(--rose-deep); }
+
+  /* 归属信息（OSM / CARTO 要求保留，收得小一些、半透明纸感） */
+  .maplibregl-ctrl-attrib{
+    background: rgba(255,253,249,.75) !important;
+    font-size: 10px !important; padding: 2px 8px !important; border-radius: 8px !important;
+  }
+
+  .pop-card{
+    background:var(--paper-card);
+    border:1.5px solid var(--line);
+    border-radius: 14px 16px 13px 15px / 15px 13px 16px 14px;
+    box-shadow: var(--shadow);
+    overflow:hidden;
+  }
+  /* 图片画廊：多图可左右滑动，简洁无特效 */
+  .pop-gallery{
+    display:flex; gap:8px; overflow-x:auto;
+    padding:10px 12px 6px;
+    scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+  }
+  .pop-gallery::-webkit-scrollbar{ display:none; }
+  .pop-gallery img{
+    flex:0 0 90%; width:90%; height:auto; max-height:42vh;
+    object-fit:cover; border-radius:9px; scroll-snap-align:center;
+    display:block; background:#f0e9df;
+  }
+  .pop-gallery img:only-child{ flex:0 0 100%; width:100%; }
+  .pop-body{ padding:16px 18px 18px; }
+  .pop-body h2{
+    margin:0; font-family:"Ma Shan Zheng","Kaiti SC","STKaiti","KaiTi",cursive;
+    font-weight:400; font-size:24px; letter-spacing:.04em; color:var(--ink);
+  }
+  .pop-date{ margin:7px 0 0; font-size:12px; letter-spacing:.14em; color:var(--rose-deep); }
+  .pop-text{
+    margin:12px 0 0; font-size:14.5px; line-height:1.85; color:#5a5650;
+    white-space:pre-wrap; word-break:break-word;
+  }
+
+  /* 窄屏上让弹窗不顶满边缘 */
+  @media (max-width: 480px){
+    .memory-popup{ max-width: calc(100vw - 40px) !important; }
+    .top-card h1{ font-size:26px; }
+  }
+
+  /* ---------- 纪念日封面 ---------- */
+  #intro-cover{
+    position:fixed; inset:0; z-index:200; display:grid; place-items:center;
+    background:#06152d url('assets/cover.png') center center / cover no-repeat;
+    opacity:1; visibility:visible; transition:opacity .65s ease, visibility .65s ease;
+  }
+  #intro-cover::after{content:""; position:absolute; inset:0; background:linear-gradient(180deg,rgba(3,12,30,.08),rgba(3,12,30,.04) 65%,rgba(3,12,30,.38)); pointer-events:none;}
+  #intro-cover.is-hidden{opacity:0; visibility:hidden; pointer-events:none;}
+  #enter-map{position:absolute; z-index:1; bottom:calc(env(safe-area-inset-bottom,0px) + 26px); left:50%; transform:translateX(-50%);
+    border:1px solid rgba(255,231,164,.78); border-radius:999px; padding:12px 24px;
+    color:#17233a; background:rgba(255,226,151,.94); font:500 14px/1.2 "Noto Serif SC","Songti SC",serif;
+    letter-spacing:.12em; box-shadow:0 0 28px rgba(255,211,120,.25); cursor:pointer; white-space:nowrap;}
+  #enter-map:active{transform:translateX(-50%) scale(.97);}
+  @media (max-width:600px){#intro-cover{background-size:contain;background-color:#06152d;}}
+
+
+  /* ---------- Midnight / nebula map experience ---------- */
+  :root{
+    --paper:#071326; --paper-card:rgba(10,24,46,.94);
+    --ink:#edf1ff; --ink-soft:#aab8d2; --line:rgba(165,190,235,.18);
+    --rose:#e7b6c8; --rose-deep:#ffd1df; --rose-fill:#422b49;
+    --shadow:0 18px 55px rgba(0,0,0,.34), 0 0 34px rgba(83,119,201,.10);
+  }
+  html,body{background:#061226;color:var(--ink);}
+  #map{background:#061226;}
+  .maplibregl-canvas{filter:saturate(.78) contrast(1.04) brightness(.88);}
+  /* Star dust and a softly blurred nebula glow; pointer events pass through to the map. */
+  .paper-noise{
+    z-index:3; opacity:.22; mix-blend-mode:screen;
+    background-image:
+      radial-gradient(1px 1px at 8% 18%,rgba(225,235,255,.65) 50%,transparent 100%),
+      radial-gradient(1px 1px at 23% 72%,rgba(225,235,255,.48) 50%,transparent 100%),
+      radial-gradient(1.5px 1.5px at 77% 23%,rgba(255,224,198,.55) 50%,transparent 100%),
+      radial-gradient(1px 1px at 88% 67%,rgba(225,235,255,.5) 50%,transparent 100%),
+      radial-gradient(1px 1px at 51% 12%,rgba(225,235,255,.42) 50%,transparent 100%),
+      radial-gradient(ellipse at 50% 42%,rgba(76,92,168,.20),transparent 38%),
+      radial-gradient(ellipse at 52% 45%,rgba(127,76,137,.12),transparent 24%),
+      linear-gradient(180deg,rgba(3,10,25,.08),rgba(3,10,25,.18));
+    background-size:100% 100%;
+  }
+  .top-card{
+    top:clamp(18px,4vh,38px);left:clamp(18px,4vw,54px);
+    padding:20px 25px 18px; min-width:220px;
+    background:rgba(7,19,39,.66); border:1px solid rgba(178,199,238,.20);
+    border-radius:18px; box-shadow:var(--shadow); backdrop-filter:blur(18px) saturate(125%);
+  }
+  .top-card h1{font-family:"Noto Serif SC","Songti SC",serif;font-size:clamp(23px,2.2vw,30px);font-weight:400;letter-spacing:.10em;color:#f4f0eb;}
+  .top-card .sub{margin-top:9px;font-size:11px;letter-spacing:.24em;color:#9eacc8;}
+  .hint{
+    bottom:clamp(18px,4vh,34px);padding:11px 19px;
+    color:#c3cce0;background:rgba(7,19,39,.72);border:1px solid rgba(178,199,238,.20);
+    border-radius:999px;box-shadow:var(--shadow);backdrop-filter:blur(16px);
+    letter-spacing:.10em;font-size:12px;
+  }
+  .hint .heart{color:#f0b8cf;}
+  .reset-btn{
+    top:clamp(18px,4vh,38px);right:clamp(18px,4vw,54px);padding:12px 19px;
+    color:#dce5fa;background:rgba(7,19,39,.72);border:1px solid rgba(178,199,238,.22);
+    border-radius:999px;box-shadow:var(--shadow);backdrop-filter:blur(16px);
+    font-size:12px;letter-spacing:.16em;transition:all .2s ease;
+  }
+  .reset-btn:hover,.reset-btn:active{color:#ffe2ee;border-color:rgba(238,190,213,.55);background:rgba(26,34,64,.88);}
+  .notice{background:rgba(9,23,44,.96);border:1px solid var(--line);border-radius:16px;color:#edf1ff;box-shadow:var(--shadow);backdrop-filter:blur(18px);}
+  .marker .heart{filter:drop-shadow(0 0 8px rgba(244,170,204,.55)) drop-shadow(0 2px 4px rgba(0,0,0,.45));}
+  .marker-label{color:#f4dce8;background:rgba(8,20,41,.82);border:1px solid rgba(232,190,214,.24);border-radius:999px;padding:4px 10px;backdrop-filter:blur(10px);box-shadow:0 4px 18px rgba(0,0,0,.22);}
+  .memory-popup .maplibregl-popup-close-button{background:rgba(14,29,54,.94);border:1px solid rgba(178,199,238,.2);color:#c5d0e7;}
+  .memory-popup .maplibregl-popup-close-button:hover{color:#ffe0eb;}
+  .maplibregl-ctrl-group{background:rgba(8,22,43,.86)!important;border:1px solid rgba(178,199,238,.18)!important;border-radius:12px!important;overflow:hidden;box-shadow:var(--shadow)!important;backdrop-filter:blur(12px);}
+  .maplibregl-ctrl-group button{background-color:transparent!important;}
+  .maplibregl-ctrl-group button span{filter:invert(.88) sepia(.12) saturate(.65);}
+  .maplibregl-ctrl-group button+button{border-top:1px solid rgba(178,199,238,.14)!important;}
+  .maplibregl-ctrl-attrib{background:rgba(7,19,39,.68)!important;color:#8f9db7!important;border-radius:8px!important;backdrop-filter:blur(10px);}
+  .maplibregl-ctrl-attrib a{color:#b9c8e5!important;}
+  .pop-card{background:rgba(9,23,44,.97);border:1px solid rgba(178,199,238,.20);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.48);backdrop-filter:blur(18px);}
+  .pop-gallery{padding:12px 12px 4px;}
+  .pop-gallery img{border-radius:10px;background:#101e36;}
+  .pop-body h2{font-family:"Noto Serif SC","Songti SC",serif;color:#f1eaf0;font-weight:400;}
+  .pop-date{color:#d9a9c2;}
+  .pop-text{color:#c4cde0;}
+  @media(max-width:600px){
+    .top-card{top:14px;left:14px;padding:15px 17px;min-width:0;}
+    .top-card h1{font-size:22px;}
+    .top-card .sub{font-size:10px;}
+    .reset-btn{top:14px;right:14px;padding:10px 14px;}
+    .hint{max-width:calc(100vw - 32px);white-space:normal;text-align:center;line-height:1.6;}
+  }
+
+</style>
+</head>
+<body>
+  <section id="intro-cover" aria-label="Yoria & Jarry 100天纪念封面">
+    <button id="enter-map" type="button">轻触这里，继续我们的故事　♡</button>
+  </section>
+
+  <div id="map"></div>
+  <div class="paper-noise" aria-hidden="true"></div>
+
+  <div class="top-card">
+    <h1>我们的 100 天</h1>
+    <div class="sub">异地 · 但心很近</div>
+  </div>
+
+  <div class="hint">轻触地图上的 <span class="heart">♡</span> ，看看我们的故事</div>
+
+  <button class="reset-btn" id="resetBtn" type="button" aria-label="回到全图">全图</button>
+
+<script>
+/* ============================================================
+ *  ① 基础配置（无需注册、无需 Token）
+ * ============================================================ */
+
+// ★ 底图：CARTO Positron —— 清爽浅色、低饱和，免费、不用注册。
+//    （国内访问偶尔慢，但通常能用； attribution 会自动显示在右下角，请保留它。）
+//    如果 Positron 在国内打不开，下面是备用的 深色栅格底图方案，
+//    把 MAP_STYLE 换成下面的变量即可（记得同时删掉 style.json 那行）：
+//
+//    const MAP_STYLE = {
+//      version: 8,
+//      sources: {
+//        osm: { type: 'raster', tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'], tileSize: 256, maxzoom: 19, attribution: '© OpenStreetMap contributors' }
+//      },
+//      layers: [{ id: 'osm', type: 'raster', source: 'osm' }]
+//    };
+//
+//    想换回 Mapbox（需要 pk. Token），见教程末尾的「附录」。
+const MAP_STYLE = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
+
+// 备用底图：OSM 栅格瓦片（内联，不需要联网拉 style.json）。
+// 主底图加载失败时会自动切换到它，避免地图一片空白。
+const OSM_RASTER_STYLE = {
+  version: 8,
+  sources: {
+    osm: {
+      type: 'raster',
+      tiles: ['https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'],
+      tileSize: 256,
+      maxzoom: 18,
+      attribution: '© OpenStreetMap contributors © CARTO',
+    },
+  },
+  layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
+};
+let styleFallbackTried = false;
+
+// 标记下方是否显示点位名称小标签。true=显示 / false=只显示爱心。
+const SHOW_LABELS = true;
+
+
+/* ============================================================
+ *  ② 点位数据 —— 「以后想加新点位，就在下面这个数组里加」
+ *
+ *  每一条的格式（照着复制粘贴即可）：
+ *
+ *  {
+ *    name:  '点位名称',
+ *    lng:   116.3974,      // 经度（longitude，WGS84）
+ *    lat:   39.9092,       // 纬度（latitude，WGS84）
+ *    date:  '2026 · 某月某日',   // 可选，不填就留 ''（空字符串）
+ *    text:  '弹窗里显示的回忆文字。\n支持换行，直接回车换行即可。',
+ *    images: [                       // 可选，图片数组，可以放多张
+ *      'images/图片1.jpg',
+ *      'images/图片2.jpg',
+ *    ],                              // 不想放图就写 images: []
+ *  },
+ *
+ *  注意：数组里每一项后面要用「英文逗号 ,」分隔，最后一项可以不加逗号。
+ * ============================================================ */
+const POINTS = [
+
+  {
+    name: '我们相遇那天，你在的城市',
+    lng: 111.9940,           // 湖南省娄底市（市中心）
+    lat: 27.7000,
+    date: '',
+    text: `ycy下次记得带火，记得接我练车，记得喂我喝水，记得去树咖啡读书，记得去桥洞散步，记得以后什么事情我们都要一起做`,
+    images: [
+      'images/childhood.jpg',
+      'images/dusk-site.jpg',
+    ],
+  },
+  {
+    name: '第一次深夜长聊的夜晚',
+    lng: 120.3826,           // 青岛（市中心）
+    lat: 36.0671,
+    date: '',
+    text: `其实在我的心里，我们的100天远不止100天。我还记得那次在青岛，半圆形的台阶上，大冷天你非要吃邦邦硬的DQ暴风雪。我有点害羞往旁边挪，谁知道你直接凑了过来。后来我们在八大关Citywalk，昏黄的灯，大街上没什么人，那一刻真的感觉整个世界都睡了，只有我们俩。在'老杰克'酒馆，我花100块点的那杯麦卡伦，心疼得要死还要装成拉菲喝。我还偷偷写了一句诗：'世界上那么多城镇，城镇里那么多酒馆，你却偏偏走进了我这一家。'通宵打完瓦，我故意地问你去不去吃早餐。我们在无目的的晨光里打打闹闹，你路感那么好，最后靠在我肩膀上睡着。从那次旅游回来，其实我就已经把你当成我对象了，哪怕你老是咬人。所以，这100天只是名义上的纪念。在我这里，从青岛那天清晨的太阳升起时，我们就已经开始了。`,
+    images: [
+      'images/qingdao-street.jpg',
+      'images/qingdao-pier.jpg',
+      'images/qingdao-beach.jpg',
+      'images/qingdao-sunset.jpg',
+      'images/qingdao-sea.jpg',
+      'images/night-1.jpg',
+    ],
+  },
+  {
+    name: '和你一起走过的北京',
+    lng: 116.4074,           // 北京（市中心）
+    lat: 39.9042,
+    date: '',
+    text: `弯弯我希望你一直这么笑下去`,
+    images: [
+      'images/beijing-tiananmen.jpg',
+      'images/beijing-lake.jpg',
+      'images/sleep.jpg',
+      'images/couple-1.jpg',
+      'images/chinahouse.jpg',
+    ],
+  },
+  {
+    name: '以后经常去的地方',
+    lng: 121.1270,           // 锦州（市中心）
+    lat: 41.0951,
+    date: '',
+    text: `小乐乐在那里不要受委屈了，经营好自己的傻福生活`,
+    images: [
+      'images/train-1.jpg',
+      'images/train-2.jpg',
+      'images/couple-3.jpg',
+      'images/couple-2.jpg',
+    ],
+  },
+  {
+    name: '南京',
+    lng: 118.7969,           // 南京（市中心）
+    lat: 32.0603,
+    date: '',
+    text: `神来南京`,
+    images: [],
+  },
+  {
+    name: '长沙',
+    lng: 112.9388,           // 长沙（市中心）
+    lat: 28.2282,
+    date: '',
+    text: `一个没有白天的地方`,
+    images: [
+      'images/night-street.jpg',
+    ],
+  },
+];
+
+
+/* ============================================================
+ *  ③ 地图初始化与渲染（一般不需要改动）
+ * ============================================================ */
+
+function showNotice(msg){
+  const n = document.createElement('div');
+  n.className = 'notice';
+  n.textContent = msg;
+  document.body.appendChild(n);
+}
+
+function esc(s){
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function renderPopup(p){
+  const imgs = Array.isArray(p.images)
+    ? p.images.filter(Boolean)
+    : (p.image && p.image.trim() ? [p.image.trim()] : []);
+  const gallery = imgs.length
+    ? '<div class="pop-gallery">'
+      + imgs.map(src => '<img src="' + esc(src) + '" alt="' + esc(p.name) + '" loading="lazy">').join('')
+      + '</div>'
+    : '';
+  const date = p.date && p.date.trim()
+    ? '<div class="pop-date">' + esc(p.date.trim()) + '</div>'
+    : '';
+  return ''
+    + '<div class="pop-card">'
+    + gallery
+    + '<div class="pop-body">'
+    +   '<h2>' + esc(p.name) + '</h2>'
+    +   date
+    +   '<p class="pop-text">' + esc(p.text) + '</p>'
+    + '</div>'
+    + '</div>';
+}
+
+function makeMarker(p){
+  const el = document.createElement('div');
+  el.className = 'marker';
+  el.innerHTML = ''
+    + (SHOW_LABELS ? '<div class="marker-label">' + esc(p.name) + '</div>' : '')
+    + '<svg class="heart" width="38" height="38" viewBox="0 0 48 48" aria-hidden="true">'
+    +   '<path d="M24 36 C 23 35.2, 7 25.4, 7 16.4 C 7 10.6, 11.8 6.6, 16.6 6.6 '
+    +        'C 19.6 6.6, 22.4 8.6, 24 11.2 C 25.6 8.6, 28.4 6.6, 31.4 6.6 '
+    +        'C 36.2 6.6, 41 10.6, 41 16.4 C 41 25.4, 25 35.2, 24 36 Z" '
+    +        'fill="#e2b7b2" stroke="#a2726d" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>'
+    + '</svg>';
+  return el;
+}
+
+// 模块级引用，供「全图」按钮与视野复位使用
+let map = null;
+let coords = [];
+
+function fitAllPoints(){
+  if (!map || coords.length === 0) return;
+  if (coords.length === 1){
+    map.jumpTo({ center: [coords[0].lng, coords[0].lat], zoom: 13 });
+  } else {
+    const bounds = new maplibregl.LngLatBounds();
+    coords.forEach(p => bounds.extend([p.lng, p.lat]));
+    map.fitBounds(bounds, {
+      padding: { top: 150, bottom: 120, left: 60, right: 60 },
+      maxZoom: 12,
+      duration: 0,
+    });
+  }
+}
+
+function initMap(){
+  if (typeof maplibregl === 'undefined'){
+    showNotice('地图库没有加载成功。\n如果是部署到了网上，请确认 vendor/ 文件夹和 index.html 一起上传了。');
+    return;
+  }
+
+  coords = POINTS.filter(p =>
+    p && typeof p.lng === 'number' && typeof p.lat === 'number'
+  );
+
+  if (coords.length === 0){
+    showNotice('还没有可显示的点位。\n请打开 index.html，在 POINTS 数组里填入至少一个点位。');
+    return;
+  }
+
+  map = new maplibregl.Map({
+    container: 'map',
+    style: MAP_STYLE,
+    center: [coords[0].lng, coords[0].lat],
+    zoom: 4,
+    attributionControl: true,
+  });
+
+  map.addControl(
+    new maplibregl.NavigationControl({ showCompass: false, showZoom: true }),
+    'bottom-right'
+  );
+
+  // 根据所有点位自动调整视野（无动画，安静不花哨）
+  map.on('load', fitAllPoints);
+
+  // 放标记 + 绑定弹窗
+  coords.forEach(p => {
+    const popup = new maplibregl.Popup({
+      className: 'memory-popup',
+      maxWidth: '320px',
+      offset: 46,
+      closeButton: true,
+      closeOnClick: true,
+      focusAfterOpen: false,
+    }).setHTML(renderPopup(p));
+
+    new maplibregl.Marker({ element: makeMarker(p), anchor: 'bottom' })
+      .setLngLat([p.lng, p.lat])
+      .setPopup(popup)
+      .addTo(map);
+  });
+
+  // 底图加载失败时自动切换到 深色栅格底图（内联，不需要联网拉 style.json）
+  map.on('error', (e) => {
+    console.warn('地图错误:', e && e.error ? e.error.message : e);
+    if (!styleFallbackTried){
+      styleFallbackTried = true;
+      try {
+        map.setStyle(OSM_RASTER_STYLE);
+        console.log('主底图加载失败，已自动切换到 深色栅格底图');
+        return;
+      } catch (err) { console.warn('深色备用底图也失败了:', err); }
+    }
+    showNotice('底图加载遇到问题（可能是网络）。\n请刷新重试，或检查能否访问 OSM / CARTO。');
+  });
+}
+
+initMap();
+
+document.getElementById('resetBtn').addEventListener('click', fitAllPoints);
+
+document.getElementById('enter-map').addEventListener('click', () => {
+  document.getElementById('intro-cover').classList.add('is-hidden');
+  setTimeout(() => { if (map) map.resize(); }, 700);
+});
+</script>
+</body>
+</html>
