@@ -215,7 +215,7 @@
   }
   html,body{background:#061226;color:var(--ink);}
   #map{background:#061226;}
-  .maplibregl-canvas{filter:saturate(.78) contrast(1.04) brightness(.88);}
+  .maplibregl-canvas{filter:saturate(.6) contrast(.96) brightness(1.02);}
   /* Star dust and a softly blurred nebula glow; pointer events pass through to the map. */
   .paper-noise{
     z-index:3; opacity:.22; mix-blend-mode:screen;
@@ -303,7 +303,7 @@
 
 // ★ 底图：CARTO Positron —— 清爽浅色、低饱和，免费、不用注册。
 //    （国内访问偶尔慢，但通常能用； attribution 会自动显示在右下角，请保留它。）
-//    如果 Positron 在国内打不开，下面是备用的 深色栅格底图方案，
+//    如果 Positron 在国内打不开，下面是备用的 浅色栅格底图方案，
 //    把 MAP_STYLE 换成下面的变量即可（记得同时删掉 style.json 那行）：
 //
 //    const MAP_STYLE = {
@@ -315,7 +315,7 @@
 //    };
 //
 //    想换回 Mapbox（需要 pk. Token），见教程末尾的「附录」。
-const MAP_STYLE = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
+const MAP_STYLE = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json';
 
 // 备用底图：OSM 栅格瓦片（内联，不需要联网拉 style.json）。
 // 主底图加载失败时会自动切换到它，避免地图一片空白。
@@ -324,10 +324,10 @@ const OSM_RASTER_STYLE = {
   sources: {
     osm: {
       type: 'raster',
-      tiles: ['https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'],
+      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
       tileSize: 256,
       maxzoom: 18,
-      attribution: '© OpenStreetMap contributors © CARTO',
+      attribution: '© OpenStreetMap contributors',
     },
   },
   layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
@@ -554,16 +554,16 @@ function initMap(){
       .addTo(map);
   });
 
-  // 底图加载失败时自动切换到 深色栅格底图（内联，不需要联网拉 style.json）
+  // 底图加载失败时自动切换到 浅色栅格底图（内联，不需要联网拉 style.json）
   map.on('error', (e) => {
     console.warn('地图错误:', e && e.error ? e.error.message : e);
     if (!styleFallbackTried){
       styleFallbackTried = true;
       try {
         map.setStyle(OSM_RASTER_STYLE);
-        console.log('主底图加载失败，已自动切换到 深色栅格底图');
+        console.log('主底图加载失败，已自动切换到 浅色栅格底图');
         return;
-      } catch (err) { console.warn('深色备用底图也失败了:', err); }
+      } catch (err) { console.warn('浅色备用底图也失败了:', err); }
     }
     showNotice('底图加载遇到问题（可能是网络）。\n请刷新重试，或检查能否访问 OSM / CARTO。');
   });
